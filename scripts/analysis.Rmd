@@ -1,0 +1,193 @@
+---
+title: "The Dutch Diminutive: Between Inflection and Derivation"
+subtitle: "Analyis Script"
+author: "Daniil Bondarenko"
+date: '`r Sys.Date()`'
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r preamble, include=FALSE}
+library(dplyr)
+library(readr)
+library(lme4)
+library(car)
+library(ggplot2)
+options(scipen = 999)
+```
+
+# Import the experimental dataset, perform some final cleanup
+```{r}
+trialdata <- read_csv("../corpus/trialdata.csv", show_col_types = FALSE)
+# Move all relevant columns to the left for better readability
+trialdata <- select(trialdata,
+                    "spelling":"dec_criterion",
+                    "rtC":"rateC",
+                    "Length":"Colt_Nphon",
+                    "item",
+                    "participant",
+                    "lower":"rateR",
+                    "rtI":"zrateI",
+                    "acc.mean":"zrateI.sd"
+)
+# Filter out the irrelevant columns based on theory-supported decisions
+# NOTE: Done here so variables could be reintroduced at will if need be
+trialdata <- select(trialdata,
+                    # OLD20 chosen as the neighbourhood var: filter out the rest
+                    -"Colt_N",
+                    -"PLD30",
+                    -"Colt_Nphon",
+                    # RTs chosen as the dependent var; filter out the rest,
+                    # do the centering and z-Transforming within the script;
+                    # filter out the pre-existing variables
+                    -"lower",
+                    -"upper",
+                    -"rtR",
+                    -"rateR",
+                    -"rtI",
+                    -"rateI",
+                    -"zrtC",
+                    -"zrateC",
+                    -"zrtI",
+                    -"zrateI",
+                    -"acc.mean",
+                    -"acc.sd",
+                    -"rtC.mean",
+                    -"rtC.sd",
+                    -"rateC.mean",
+                    -"rateC.sd",
+                    -"zrtC.mean",
+                    -"zrtC.sd",
+                    -"zrateC.mean",
+                    -"zrateC.sd",
+                    -"rtI.mean",
+                    -"rtI.sd",
+                    -"rateI.mean",
+                    -"rateI.sd",
+                    -"zrtI.mean",
+                    -"zrtI.sd",
+                    -"zrateI.mean",
+                    -"zrateI.sd"
+)
+```
+
+# Run sanity checks: plots, correlations, etc.
+```{r}
+# Check for correlations using Pearson's R
+summary(trialdata$SUBTLEX2)
+```
+
+# Finalise fine preprocessing: contrasts, centering, etc.
+```{r}
+# Motivate the log-transformation with reference to Winter 2020 and
+# Smith and Levy 2013 therein
+hist(trialdata$rtC)
+trialdata$logRT <- log(trialdata$rtC)
+hist(trialdata$logRT)
+# Center and standardize vars like word length and freq
+hist(trialdata$SUBTLEX2)
+trialdata$logfreq <- log10(trialdata$SUBTLEX2 + 0.1)
+hist(trialdata$logfreq)
+
+trialdata <- mutate(trialdata,
+                    logfreq_z = scale(logfreq),
+                    len_z = scale(Length),
+                    nsyl_z = scale(Nsyl),
+                    old_z = scale(OLD20),
+                    conc_z = scale(Concreteness),
+                    aoa_z = scale(AoA),
+                    wp_z = scale(Word_prevalence1))
+```
+
+# Descriptive Statistics
+```{r}
+# Get means for the diminutives
+trialdata %>% group_by(dim_type) %>% 
+  summarize(M = mean(rtC), SD = sd(rtC))
+
+# Run paired t-tests, see if the differences between those means are significant
+df1 <- trialdata %>%
+    filter(dim_type == "both" | dim_type == "infl") %>%
+    select(dim_type, rtC)
+df2 <- trialdata %>%
+    filter(dim_type == "infl" | dim_type == "deriv") %>%
+    select(dim_type, rtC)
+df3 <- trialdata %>%
+    filter(dim_type == "deriv" | dim_type == "undecided") %>%
+    select(dim_type, rtC)
+t.test(rtC ~ dim_type, data = df1)
+t.test(rtC ~ dim_type, data = df2)
+t.test(rtC ~ dim_type, data = df3)
+
+trialdata %>% ggplot(aes(x = dim_type, y = logRT, fill = dim_type)) +
+  geom_boxplot() + theme_minimal() +
+  scale_fill_brewer(palette = "PuOr")
+ggsave("../figures/dim_box.png", width = 8, height = 6)
+
+trialdata %>% ggplot(aes(x = logRT, fill = dim_type)) +
+  geom_density(alpha = 0.5) + theme_minimal() +
+  scale_fill_brewer(palette = "PuOr")
+ggsave("../figures/dim_density.png", width = 8, height = 6)
+```
+
+# Inferential Statistics
+```{r}
+mod.base <- lmer(logRT ~logfreq_z + (1|participant), data = trialdata)
+summary(mod.base)
+
+mod.base.nearfull <- lmer(logRT ~ 
+                        logfreq_z +
+                        len_z + 
+                        nsyl_z +
+                        old_z +
+                        conc_z +
+                        aoa_z +
+                        wp_z + 
+                        (1|participant), data = trialdata)
+summary(mod.base.nearfull)
+
+mod.base.full <- lmer(logRT ~ 
+                        logfreq_z +
+                        len_z + 
+                        nsyl_z +
+                        old_z +
+                        conc_z +
+                        aoa_z +
+                        wp_z + 
+                   (1|participant) +
+                   (1|spelling), data = trialdata)
+summary(mod.base.full)
+anova(mod.base.nearfull, mod.base.full)
+
+res <- residuals(mod.base.full)
+hist(res)
+qqnorm(res)
+qqline(res)
+plot(fitted(mod.base.full), res)
+
+mod.full <- lmer(logRT ~ 
+                   dim_type +
+                   logfreq_z +
+                   len_z + 
+                   nsyl_z +
+                   old_z +
+                   conc_z +
+                   aoa_z +
+                   wp_z + 
+                   (1|participant) +
+                   (1|spelling), data = trialdata)
+summary(mod.full)
+anova(mod.base.full, mod.full)
+
+# Plot 1, histogram:
+hist(residuals(mod.full), col = 'skyblue2')
+# Plot 2, Q-Q plot:
+qqnorm(residuals(mod.full))
+qqline(residuals(mod.full))
+# Plot 3, residual plot:
+plot(fitted(mod.full), residuals(mod.full))
+```
+
