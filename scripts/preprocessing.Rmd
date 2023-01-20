@@ -10,14 +10,14 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+## 0. Important notice
+
+This script is not strictly necessary for replication purposes and is bundled with the rest of the project for the sake of transparency. If you are only interested in replicating the findings on your machine, skip this script and proceed directly to "analysis.Rmd". However, if you want to trace every single data processing step undertaken in order to set up the experimental dataset for the current project, feel free to poke around!
 
 ```{r preamble, echo=FALSE, include=FALSE}
 library(dplyr)
 library(readr)
 ```
-## 0. Important notice
-
-This script is not strictly necessary for replication purposes and is bundled with the rest of the project for the sake of transparency. If you are only interested in replicating the findings on your machine, skip this script and proceed directly to "analysis.Rmd". However, if you want to trace every single data processing step undertaken in order to set up the experimental dataset for the current project, feel free to poke around!
 
 ## 1. Import all datasets for preprocessing and merging
 
@@ -74,10 +74,10 @@ The project is rooted within the framework of Distributed Morphology and based o
 
 
 ### 3.1. Guidelines used for value assignment
+
 Each item was assigned a value for the variable "dim_type" and a value for "dec_criterion", alongside a straightforward morpheme count. The guidelines of assignment closely followed the distinguishing features of the two diminutives: an item was assigned "infl" for "Inflectional" if a) its meaning was compositional in nature, usually reflecting the "small X" pattern, or if b) it forced a kind-to-item reading shift; conversely, non-compositional items (either lexicalised diminutives or diminutiva tantum) were assigned "deriv" for "Derivational". An additional test for the derivational nature of the suffixed item was to check for the item exhibiting the predicted suffixal allomorph (see Phonological Allomorphy Generalisations below): thus, bloem-pje "small flower" features the predicted allomorph -pje and is treated as inflected, bloem-etje has a different allomorph from the expected -pje and means "bouquet" instead, hence it being treated as derived. 
 
 The value "dec_criterion" stands for "Decisive Criterion", but can as well be read as defining the subtype of diminutive, with values "small_X", "kind_to_item", "lex_dim" and "dim_tant" reflecting the assignment criteria above. Items that had at least one of the inflectional and one of the derivational type readings at the same time, as reflected in native speaker intuitions and attested in the item entry on https://nl.wiktionary.org/, were assigned the value "both" for the variable "dim_type" and a combination of the four subtype values for the variable "dec_criterion".
-
 
 ### 3.2. Phonological Allomorphy Generalisations
 
@@ -92,6 +92,8 @@ The value "dec_criterion" stands for "Decisive Criterion", but can as well be re
   - kastanje "chestnut": simplex, not diminutive
   - plunje "(certain) clothing": etymologically diminutive, too opaque
   - rapalje "riffraff": old spelling of "rapaille", simplex, not diminutive
+  - schoelje "crook, thug": morphological nature uncertain
+  - werkplunje "work clothing": plunje etymologically diminutive, too opaque
 
 ## 4. Finalise rough preprocessing
 ```{r}

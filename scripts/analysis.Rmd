@@ -10,17 +10,25 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r preamble, include=FALSE}
-library(dplyr)
-library(readr)
-library(lme4)
-library(car)
-library(ggplot2)
-options(scipen = 999)
+## 0. Important notice
+
+This script is the only one you should need to run in order to replicate the results of the study. While "preprocessing.Rmd" relies on the externally-accessed DLP2 files in order to build the experimental dataset in the first place, here the dataset is already assembled and ready for final data transformations and subsequent analysis. If you're looking to get a full picture of the pipeline and account for every data-related step within this project, feel free to peek into the preprocessing script. Otherwise, you should be good to go!
+
+## 1. Import the necessary R packages
+```{r preamble, echo=TRUE, message=FALSE, warning=FALSE}
+library(dplyr) # For data cleanup and transformations
+library(readr) # For more straightforward ways to import/export data
+library(lme4) # For mixed-effects linear regression modelling
+library(car) # For alternative options when it comes to plots and regressions
+library(ggplot2) # For a more comprehensive way of plotting data
+library(effsize) # For Cohen's d, etc.
+library(afex) # For likelihood ratio tests
+library(MuMIn) # For extracting R-squared values from lmers
+options(scipen = 999) # For easier interpretability of the slopes
 ```
 
-# Import the experimental dataset, perform some final cleanup
-```{r}
+## 2. Import the experimental dataset, perform some final cleanup
+```{r data_import}
 trialdata <- read_csv("../corpus/trialdata.csv", show_col_types = FALSE)
 # Move all relevant columns to the left for better readability
 trialdata <- select(trialdata,
@@ -36,6 +44,7 @@ trialdata <- select(trialdata,
 # Filter out the irrelevant columns based on theory-supported decisions
 # NOTE: Done here so variables could be reintroduced at will if need be
 trialdata <- select(trialdata,
+                    -"N_phonemes",
                     # OLD20 chosen as the neighbourhood var: filter out the rest
                     -"Colt_N",
                     -"PLD30",
@@ -53,8 +62,6 @@ trialdata <- select(trialdata,
                     -"zrateC",
                     -"zrtI",
                     -"zrateI",
-                    -"acc.mean",
-                    -"acc.sd",
                     -"rtC.mean",
                     -"rtC.sd",
                     -"rateC.mean",
@@ -74,120 +81,185 @@ trialdata <- select(trialdata,
 )
 ```
 
-# Run sanity checks: plots, correlations, etc.
-```{r}
+## 3. Run sanity checks
+```{r sanity}
+# Compare number of rows per diminutive condition
+trialdata <- mutate(trialdata, dim_type=factor(dim_type))
+class(trialdata$dim_type) == 'factor'
+summary(trialdata$dim_type)
+
 # Check for correlations using Pearson's R
-summary(trialdata$SUBTLEX2)
+cor(trialdata$SUBTLEX2, trialdata$Length)
+cor(trialdata$Length, trialdata$Nsyl)
+cor(trialdata$Length, trialdata$nmorph)
+cor(trialdata$Nsyl, trialdata$nmorph)
+# Both length and morpheme count pretty highly correlated with syllable count;
+# Keeping Nsyl has much less of a theoretical reason and might impact the
+# effects of the other two predictors; exlude it from the analysis.
+trialdata <- select(trialdata, -"Nsyl")
+
+# There's only two items past the 11000 mark
+par(mfrow = c(1, 2))
+with(trialdata, plot(SUBTLEX2, rtC)) 
+with(trialdata, plot(SUBTLEX2, acc.mean))
+# Find out what they are
+trialdata %>% 
+  select("spelling", "SUBTLEX2") %>%
+  distinct() %>% 
+  arrange(desc(SUBTLEX2)) %>%
+  head()
+# "beetje" and "meisje" both have egregiously extreme freq values;
+# all the more reason to log-transform the frequency measure 
+# (see the DLP2 paper and Winter 2020 for theoretical motivation) 
 ```
 
-# Finalise fine preprocessing: contrasts, centering, etc.
-```{r}
-# Motivate the log-transformation with reference to Winter 2020 and
-# Smith and Levy 2013 therein
-hist(trialdata$rtC)
-trialdata$logRT <- log(trialdata$rtC)
-hist(trialdata$logRT)
-# Center and standardize vars like word length and freq
-hist(trialdata$SUBTLEX2)
-trialdata$logfreq <- log10(trialdata$SUBTLEX2 + 0.1)
-hist(trialdata$logfreq)
+## 4. Finalise fine preprocessing
+```{r final_preprocessing}
+# Optional step: exclude the non-core diminutive items first, 
+# i.e. the ones with multiple ways to parse.
+# NOTE: make sure to change contrasts below!
+trialdata <- filter(trialdata, dim_type !="both")
 
+# Log-transform reaction times using the base logarithm (see Winter 2020)
+trialdata$logRT <- log(trialdata$rtC)
+par(mfrow = c(1, 2))
+hist(trialdata$rtC)
+hist(trialdata$logRT)
+# See SUBTLEX-UK: A new and improved word frequency database for British English
+# By Van Heuven et al., 2014 for motivation for Zipf-vals for frequency
+trialdata$freq_zipf <- log10(trialdata$SUBTLEX2+0.01)+3
+summary(trialdata$freq_zipf)
+par(mfrow = c(1, 2))
+hist(trialdata$SUBTLEX2)
+hist(trialdata$freq_zipf)
+cor(trialdata$freq_zipf, trialdata$Word_prevalence1)
+
+# Center all the relevant predictors for an easier comparison of effect size
 trialdata <- mutate(trialdata,
-                    logfreq_z = scale(logfreq),
+                    zipf_z = scale(freq_zipf),
                     len_z = scale(Length),
-                    nsyl_z = scale(Nsyl),
+                    nmorph_z = scale(nmorph),
                     old_z = scale(OLD20),
                     conc_z = scale(Concreteness),
                     aoa_z = scale(AoA),
                     wp_z = scale(Word_prevalence1))
+
+# Look into the word prevalence measure
+# It already consists of z-Scores, but based on the entire corpus
+# Compare to the freshly recentered distribution
+par(mfrow = c(1, 2))
+hist(trialdata$Word_prevalence1)
+hist(trialdata$wp_z)
 ```
 
-# Descriptive Statistics
-```{r}
+## 5. Descriptive Statistics
+```{r desc_stats}
 # Get means for the diminutives
 trialdata %>% group_by(dim_type) %>% 
   summarize(M = mean(rtC), SD = sd(rtC))
 
-# Run paired t-tests, see if the differences between those means are significant
-df1 <- trialdata %>%
-    filter(dim_type == "both" | dim_type == "infl") %>%
-    select(dim_type, rtC)
-df2 <- trialdata %>%
-    filter(dim_type == "infl" | dim_type == "deriv") %>%
-    select(dim_type, rtC)
-df3 <- trialdata %>%
-    filter(dim_type == "deriv" | dim_type == "undecided") %>%
-    select(dim_type, rtC)
-t.test(rtC ~ dim_type, data = df1)
-t.test(rtC ~ dim_type, data = df2)
-t.test(rtC ~ dim_type, data = df3)
-
-trialdata %>% ggplot(aes(x = dim_type, y = logRT, fill = dim_type)) +
+trialdata %>% ggplot(aes(x = dim_type, y = rtC, fill = dim_type)) +
   geom_boxplot() + theme_minimal() +
   scale_fill_brewer(palette = "PuOr")
 ggsave("../figures/dim_box.png", width = 8, height = 6)
 
-trialdata %>% ggplot(aes(x = logRT, fill = dim_type)) +
+trialdata %>% ggplot(aes(x = rtC, fill = dim_type)) +
   geom_density(alpha = 0.5) + theme_minimal() +
   scale_fill_brewer(palette = "PuOr")
 ggsave("../figures/dim_density.png", width = 8, height = 6)
+
+# Derived wordforms take the longest on average;
+# Inflected wordforms take about 13 ms less on average;
+# Wordforms with multiple ways of analysis take the least time on average
+# To say that this was unexpected is to say nothing at all.
 ```
 
-# Inferential Statistics
+## 6. Inferential Statistics
+
+Here, we will finally handle some tests that will let us draw conclusions from the sample about the population at large. We start with assigning contrasts, then run a simple t-test and then move on to modelling.
+
+```{r contrasts_prep}
+# Prepare the diminutive variable: check contrasts
+trialdata <- mutate(trialdata, dim_type=factor(dim_type))
+contrasts(trialdata$dim_type)
+```
+
+### 6.1. Contrasts and t-tests
+The next two code chunks handle the contrast coding; they are mutually exclusive depending on the decision to include observations with "both" as a value for dim_type. In order to switch between them, go to the chunk options and specify *eval=FALSE* to stop the script from running the code and *include=FALSE* to prevent the code from being included in the final knitted document.
+
+The motivation for sum-coding between "deriv" and "infl" is taken from Winter 2020, where it is argued that sum-coding is better suited for mixed-effects models with interactions and random effects; additionally, sum-coding is argued to make the coefficients easier to interpret.
+```{r contrasts_sum}
+# Sum-coding for a purely deriv/infl dataset (see above)
+contrasts(trialdata$dim_type) <- contr.sum(2)
+contrasts(trialdata$dim_type)
+t.test(rtC ~ dim_type, data = trialdata)
+```
+
+The motivation for Helmert-coding between "deriv", "infl", and "both" is simple: for wordforms with either "deriv" or "infl", a single decomposition pipeline is proposed. Assuming structural differences, recognizing either is the same type of operation being performed in a different location in the structure. Compare with "both", where the decomposition apparatus presumably pursues both leads at once; therefore, this should be reflected in the coding as such:
+
+  - First, compare the differences between deriv and infl (either x or y)
+  - Then, compare their average RTs to both (x and y at the same time)
+  
+```{r contrasts_helmert, eval=FALSE, include=FALSE}
+# Helmert coding for deriv/infl/both dataset:
+# Compare the means of deriv and infl, then compare their average to both
+ctrMatrix <- cbind(c(0, -1, 1), c(-2, 1, 1))
+contrasts(trialdata$dim_type) <- ctrMatrix
+contrasts(trialdata$dim_type)
+# Run paired t-tests, see if the differences between those means are significant
+df1 <- trialdata %>%
+    filter(dim_type == "deriv" | dim_type == "infl") %>%
+    select(dim_type, rtC)
+df2 <- trialdata %>%
+    filter(dim_type == "infl" | dim_type == "both") %>%
+    select(dim_type, rtC)
+df3 <- trialdata %>%
+    filter(dim_type == "both" | dim_type == "deriv") %>%
+    select(dim_type, rtC)
+t.test(rtC ~ dim_type, data = df1)
+t.test(rtC ~ dim_type, data = df2)
+t.test(rtC ~ dim_type, data = df3)
+```
+
+### 6.2. Modelling
+
+The formula for the experimental model closely follows the formula reported in the DLP2 paper, with the addition of two predictors:
+
+  a. dim_type, a factor with values "deriv" and "infl" (possibly "both" for the expanded dataset): see above for the discussion of the predictions.
+  b. nmorph, a numeric with values reflecting the (observable and theoretically motivated) morpheme count in the structure of each wordform: assuming full decomposition, every word is broken down to the most primitive units (= morphemes), so it logically follows that the more morphemes a wordform consists of, the more there is to break down and recompose, and the more time it should take to recognize a word.
+  
+The final formula of the model is therefore this (see "mod_full" below):
+
+***RT ~ Frequency\*Length + Morpheme count + OLD20 ratings + Concreteness + Age of acquisition + Word prevalence + Varying intercept by participant + Varying slope by participant + Varying intercept by item***
+
 ```{r}
-mod.base <- lmer(logRT ~logfreq_z + (1|participant), data = trialdata)
-summary(mod.base)
+# Run the base model with only frequency and random intercepts
+# Mention including the participant slopes and item intercepts as the 
+# motivation to satisfy the independence assumption (Winter 2020, Ch.14)
+mod.base <- lmer(logRT ~ zipf_z + 
+                   (1|participant) + 
+                   (1|item), data = trialdata, REML = TRUE)
+summary(mod.base) # Make sure the frequency findings aren't wildly off
+r.squaredGLMM(mod.base)
 
-mod.base.nearfull <- lmer(logRT ~ 
-                        logfreq_z +
-                        len_z + 
-                        nsyl_z +
-                        old_z +
-                        conc_z +
-                        aoa_z +
-                        wp_z + 
-                        (1|participant), data = trialdata)
-summary(mod.base.nearfull)
+# Residuals seem pretty skewed; plot for a visual
+hist(residuals(mod.base), col = 'skyblue2') # Plot 1, histogram:
+qqPlot(residuals(mod.base)) # Plot 2, Q-Q plot:
+plot(fitted(mod.base), residuals(mod.base)) # Plot 3, residual plot:
+# NOTE: a noticeable positive skew in the residuals; what now?
 
-mod.base.full <- lmer(logRT ~ 
-                        logfreq_z +
-                        len_z + 
-                        nsyl_z +
-                        old_z +
-                        conc_z +
-                        aoa_z +
-                        wp_z + 
-                   (1|participant) +
-                   (1|spelling), data = trialdata)
-summary(mod.base.full)
-anova(mod.base.nearfull, mod.base.full)
-
-res <- residuals(mod.base.full)
-hist(res)
-qqnorm(res)
-qqline(res)
-plot(fitted(mod.base.full), res)
-
-mod.full <- lmer(logRT ~ 
-                   dim_type +
-                   logfreq_z +
-                   len_z + 
-                   nsyl_z +
-                   old_z +
-                   conc_z +
-                   aoa_z +
-                   wp_z + 
-                   (1|participant) +
-                   (1|spelling), data = trialdata)
-summary(mod.full)
-anova(mod.base.full, mod.full)
-
-# Plot 1, histogram:
-hist(residuals(mod.full), col = 'skyblue2')
-# Plot 2, Q-Q plot:
-qqnorm(residuals(mod.full))
-qqline(residuals(mod.full))
-# Plot 3, residual plot:
-plot(fitted(mod.full), residuals(mod.full))
+# Run the full model and assess each factor's contributions using mixed()
+mod_full <- lmer(logRT ~ 
+                dim_type +
+                zipf_z*len_z + 
+                nmorph_z +
+                old_z +
+                conc_z +
+                aoa_z +
+                wp_z + 
+                (dim_type|participant) +
+                (1|item), data = trialdata)
+summary(mod_full)
+r.squaredGLMM(mod_full)
+vif(mod_full) # Get variance inflation factors to check for collinearity
 ```
-
