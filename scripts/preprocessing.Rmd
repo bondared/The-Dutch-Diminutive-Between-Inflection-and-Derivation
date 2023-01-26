@@ -49,7 +49,7 @@ data$dim_type = "none"
 data[grepl(".+je$", data$spelling),]$dim_type <- "undecided"
 
 # Use the "undecided" value to filter for only diminutives
-diminutives <- filter(data, dim_type=="undecided") # 364 in total
+diminutives <- filter(data, dim_type=="undecided") # 350 in total
 # Set up a few values for manual assignment
 diminutives$nmorph <- 0
 diminutives$double_checked <- 0

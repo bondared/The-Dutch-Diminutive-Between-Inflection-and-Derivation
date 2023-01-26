@@ -21,8 +21,9 @@ library(readr) # For more straightforward ways to import/export data
 library(lme4) # For mixed-effects linear regression modelling
 library(car) # For alternative options when it comes to plots and regressions
 library(ggplot2) # For a more comprehensive way of plotting data
+library(ggpubr) # For including statistical values in plots
 library(effsize) # For Cohen's d, etc.
-library(afex) # For likelihood ratio tests
+library(afex) # For p-values in lmer summaries
 library(MuMIn) # For extracting R-squared values from lmers
 options(scipen = 999) # For easier interpretability of the slopes
 ```
@@ -83,19 +84,48 @@ trialdata <- select(trialdata,
 
 ## 3. Run sanity checks
 ```{r sanity}
+# Make sure the response variable looks fine
+summary(trialdata$rtC) # Seems some responses are unreasonably long
+densityPlot(trialdata$rtC) # Few past 1000, even fewer past 1500
+cat(
+  "Only", NROW(filter(trialdata, rtC > 1500)), "observations past 1500 \n",
+  "Only", NROW(filter(trialdata, rtC > 1250)), "observations past 1250 \n",
+  "Only", NROW(filter(trialdata, rtC > 1000)), "observations past 1000 \n"
+)
+
+# Need to subset by some number; 1250 as the sweet spot.
+# NOTE: not subsetting the data here leads to an pretty awful skew in model
+# residuals; seems not even log-transforming the rt value is enough to
+# eliminate the effect of these more extreme values.
+trialdata <- filter(trialdata, rtC < 1250)
+
 # Compare number of rows per diminutive condition
 trialdata <- mutate(trialdata, dim_type=factor(dim_type))
-class(trialdata$dim_type) == 'factor'
 summary(trialdata$dim_type)
 
+# Check distributions of all relevant predictors
+trialdata %>% select("SUBTLEX2",
+                     "Length",
+                     "Nsyl",
+                     "nmorph",
+                     "OLD20",
+                     "Concreteness",
+                     "AoA",
+                     "Word_prevalence1") %>% summary()
+
 # Check for correlations using Pearson's R
-cor(trialdata$SUBTLEX2, trialdata$Length)
-cor(trialdata$Length, trialdata$Nsyl)
-cor(trialdata$Length, trialdata$nmorph)
-cor(trialdata$Nsyl, trialdata$nmorph)
+cat(
+  "SUBTLEX2~Length =", cor(trialdata$SUBTLEX2, trialdata$Length), "\n",
+  "Length~Nsyl =", cor(trialdata$Length, trialdata$Nsyl), "\n",
+  "Length~nmorph =", cor(trialdata$Length, trialdata$nmorph), "\n",
+  "Nsyl~nmorph =", cor(trialdata$Nsyl, trialdata$nmorph), "\n",
+  "Length~OLD20 =", cor(trialdata$Length, trialdata$OLD20), "\n",
+  "nmorph~OLD20 =", cor(trialdata$nmorph, trialdata$OLD20)
+)
+
 # Both length and morpheme count pretty highly correlated with syllable count;
 # Keeping Nsyl has much less of a theoretical reason and might impact the
-# effects of the other two predictors; exlude it from the analysis.
+# effects of the other two predictors; exclude it from the analysis.
 trialdata <- select(trialdata, -"Nsyl")
 
 # There's only two items past the 11000 mark
@@ -109,8 +139,7 @@ trialdata %>%
   arrange(desc(SUBTLEX2)) %>%
   head()
 # "beetje" and "meisje" both have egregiously extreme freq values;
-# all the more reason to log-transform the frequency measure 
-# (see the DLP2 paper and Winter 2020 for theoretical motivation) 
+# all the more reason to use Zipf-vals (See SUBTLEX-UK by Van Heuven et al., 2014)
 ```
 
 ## 4. Finalise fine preprocessing
@@ -120,21 +149,19 @@ trialdata %>%
 # NOTE: make sure to change contrasts below!
 trialdata <- filter(trialdata, dim_type !="both")
 
-# Log-transform reaction times using the base logarithm (see Winter 2020)
+# Log-transform reaction times using the base logarithm (see Winter 2019)
 trialdata$logRT <- log(trialdata$rtC)
 par(mfrow = c(1, 2))
 hist(trialdata$rtC)
 hist(trialdata$logRT)
-# See SUBTLEX-UK: A new and improved word frequency database for British English
-# By Van Heuven et al., 2014 for motivation for Zipf-vals for frequency
+
+# Zipf-values for frequency (see Van Heuven et al., 2014)
 trialdata$freq_zipf <- log10(trialdata$SUBTLEX2+0.01)+3
-summary(trialdata$freq_zipf)
 par(mfrow = c(1, 2))
 hist(trialdata$SUBTLEX2)
 hist(trialdata$freq_zipf)
-cor(trialdata$freq_zipf, trialdata$Word_prevalence1)
 
-# Center all the relevant predictors for an easier comparison of effect size
+# Standardise all the relevant predictors for an easier comparison of effect size
 trialdata <- mutate(trialdata,
                     zipf_z = scale(freq_zipf),
                     len_z = scale(Length),
@@ -142,57 +169,69 @@ trialdata <- mutate(trialdata,
                     old_z = scale(OLD20),
                     conc_z = scale(Concreteness),
                     aoa_z = scale(AoA),
-                    wp_z = scale(Word_prevalence1))
+                    # Word prevalence already standardised, just center
+                    wp_z = scale(Word_prevalence1, scale = FALSE))
 
-# Look into the word prevalence measure
-# It already consists of z-Scores, but based on the entire corpus
-# Compare to the freshly recentered distribution
-par(mfrow = c(1, 2))
-hist(trialdata$Word_prevalence1)
-hist(trialdata$wp_z)
 ```
 
 ## 5. Descriptive Statistics
+```{r boxplot_stats_setup, include=FALSE}
+get_box_stats <- function(y, upper_limit = max(trialdata$logRT) * 1.1) {
+  return(data.frame(
+    y = 0.95 * upper_limit,
+    label = paste(
+      "Count =", length(y), "\n",
+      "Mean =", round(mean(y), 2), "\n",
+      "Median =", round(median(y), 2), "\n"
+    )
+  ))
+}
+```
+
+
 ```{r desc_stats}
 # Get means for the diminutives
 trialdata %>% group_by(dim_type) %>% 
   summarize(M = mean(rtC), SD = sd(rtC))
 
-trialdata %>% ggplot(aes(x = dim_type, y = rtC, fill = dim_type)) +
-  geom_boxplot() + theme_minimal() +
-  scale_fill_brewer(palette = "PuOr")
+# Make a plot with all the relevant statistics, throw in a t-test as well
+trialdata %>% ggplot(aes(x = dim_type, y = logRT, fill = dim_type)) +
+  stat_boxplot(geom ='errorbar', linewidth=1, width=.5) + 
+  geom_boxplot(lwd=1, width=.7, show.legend = FALSE) + theme_minimal() +
+  labs(
+    x = "Diminutive Type",
+    y = "Reaction Times",
+  ) +
+  scale_x_discrete(labels=c('Derivational', 'Inflectional')) + 
+  stat_summary(fun.data = get_box_stats, geom = "text", hjust = 0.5, vjust = 0.9) +
+  scale_fill_brewer(palette = "Paired") +
+  stat_compare_means(method="t.test", label.y = 6.0, label.x = 1.35)
+# Save the plot for later
 ggsave("../figures/dim_box.png", width = 8, height = 6)
-
-trialdata %>% ggplot(aes(x = rtC, fill = dim_type)) +
-  geom_density(alpha = 0.5) + theme_minimal() +
-  scale_fill_brewer(palette = "PuOr")
-ggsave("../figures/dim_density.png", width = 8, height = 6)
-
-# Derived wordforms take the longest on average;
-# Inflected wordforms take about 13 ms less on average;
-# Wordforms with multiple ways of analysis take the least time on average
-# To say that this was unexpected is to say nothing at all.
 ```
 
 ## 6. Inferential Statistics
 
 Here, we will finally handle some tests that will let us draw conclusions from the sample about the population at large. We start with assigning contrasts, then run a simple t-test and then move on to modelling.
 
-```{r contrasts_prep}
+```{r contrasts_prep, include=FALSE}
 # Prepare the diminutive variable: check contrasts
 trialdata <- mutate(trialdata, dim_type=factor(dim_type))
-contrasts(trialdata$dim_type)
 ```
 
 ### 6.1. Contrasts and t-tests
 The next two code chunks handle the contrast coding; they are mutually exclusive depending on the decision to include observations with "both" as a value for dim_type. In order to switch between them, go to the chunk options and specify *eval=FALSE* to stop the script from running the code and *include=FALSE* to prevent the code from being included in the final knitted document.
 
 The motivation for sum-coding between "deriv" and "infl" is taken from Winter 2020, where it is argued that sum-coding is better suited for mixed-effects models with interactions and random effects; additionally, sum-coding is argued to make the coefficients easier to interpret.
+
 ```{r contrasts_sum}
 # Sum-coding for a purely deriv/infl dataset (see above)
 contrasts(trialdata$dim_type) <- contr.sum(2)
 contrasts(trialdata$dim_type)
 t.test(rtC ~ dim_type, data = trialdata)
+t.test(logRT ~ dim_type, data = trialdata)
+cohen.d(rtC ~ dim_type, data = trialdata)
+cohen.d(logRT ~ dim_type, data = trialdata)
 ```
 
 The motivation for Helmert-coding between "deriv", "infl", and "both" is simple: for wordforms with either "deriv" or "infl", a single decomposition pipeline is proposed. Assuming structural differences, recognizing either is the same type of operation being performed in a different location in the structure. Compare with "both", where the decomposition apparatus presumably pursues both leads at once; therefore, this should be reflected in the coding as such:
@@ -225,41 +264,237 @@ t.test(rtC ~ dim_type, data = df3)
 
 The formula for the experimental model closely follows the formula reported in the DLP2 paper, with the addition of two predictors:
 
-  a. dim_type, a factor with values "deriv" and "infl" (possibly "both" for the expanded dataset): see above for the discussion of the predictions.
+  a. dim_type, a factor with values "deriv" and "infl" (possibly "both" for the expanded dataset)
   b. nmorph, a numeric with values reflecting the (observable and theoretically motivated) morpheme count in the structure of each wordform: assuming full decomposition, every word is broken down to the most primitive units (= morphemes), so it logically follows that the more morphemes a wordform consists of, the more there is to break down and recompose, and the more time it should take to recognize a word.
+  
+Note the absence of two predictors reported for the DLP2 model, namely Nsyl and Length. The justification for both is the high degree of correlation between Length, Nsyl, nmoprh and OLD20 as explanatory variables that all in some ways have to deal with length. Nsyl, the number of syllables, was excluded first in favour of the more theoretically relevant nmoprh. Dropping length was a tough decision that was ultimately made after some stepwise modelling to establish which of the two factors, length or OLD20, would contribute more to explaining the variance in the dataset.
   
 The final formula of the model is therefore this (see "mod_full" below):
 
-***RT ~ Frequency\*Length + Morpheme count + OLD20 ratings + Concreteness + Age of acquisition + Word prevalence + Varying intercept by participant + Varying slope by participant + Varying intercept by item***
+***RT ~ Diminutive Type*Frequency + Morpheme count + OLD20 ratings + Concreteness + Age of acquisition + Word prevalence + Varying intercepts by participant and by item***
 
-```{r}
+```{r base_model}
 # Run the base model with only frequency and random intercepts
 # Mention including the participant slopes and item intercepts as the 
 # motivation to satisfy the independence assumption (Winter 2020, Ch.14)
-mod.base <- lmer(logRT ~ zipf_z + 
+mod_base <- lmer(logRT ~ zipf_z + 
                    (1|participant) + 
                    (1|item), data = trialdata, REML = TRUE)
-summary(mod.base) # Make sure the frequency findings aren't wildly off
-r.squaredGLMM(mod.base)
+summary(mod_base) # Make sure the frequency findings aren't wildly off
+r.squaredGLMM(mod_base)
 
-# Residuals seem pretty skewed; plot for a visual
-hist(residuals(mod.base), col = 'skyblue2') # Plot 1, histogram:
-qqPlot(residuals(mod.base)) # Plot 2, Q-Q plot:
-plot(fitted(mod.base), residuals(mod.base)) # Plot 3, residual plot:
-# NOTE: a noticeable positive skew in the residuals; what now?
+hist(residuals(mod_base), col = 'skyblue2') # Plot 1, histogram
+qqPlot(residuals(mod_base)) # Plot 2, Q-Q plot
+plot(fitted(mod_base), residuals(mod_base)) # Plot 3, residual plot
+```
 
-# Run the full model and assess each factor's contributions using mixed()
+
+```{r stepwise_bollocks, eval=FALSE, include=FALSE}
+# A purely exploratory chunk where all the predictors are added one-by-one
+# to assess relative model performance (just crossing the "t"s and dotting the "i"s)
+
+mod.null <- lmer(logRT ~ 1 + (1|participant), data = trialdata)
+mod.null.item <- lmer(logRT ~ 1 + (1|participant) + (1|item), data = trialdata)
+anova(mod.null, mod.null.item) # Better
+
+mod.base <- lmer(logRT ~ zipf_z + (1|participant) + (1|item), data = trialdata)
+anova(mod.null.item, mod.base) # Better
+r.squaredGLMM(mod.base) # Fixed effects: 4.3%; Fixed+Random: 42.6%
+
+mod.len <- lmer(logRT ~ 
+                   zipf_z + 
+                   len_z + 
+                   (1|participant) + 
+                   (1|item), data = trialdata)
+anova(mod.base, mod.len) # Better
+summary(mod.len) # Length statistically significant
+# Length barely contributes to explaining the variance
+r.squaredGLMM(mod.len) # Fixed effects: 4.7%; Fixed+Random: 42.6%
+vif(mod.len) # Variance Inflation Factors OK
+
+mod.flm <- lmer(logRT ~ 
+                   zipf_z + 
+                   len_z + 
+                   nmorph_z +
+                   (1|participant) + 
+                   (1|item), data = trialdata)
+anova(mod.len, mod.flm) # Not better
+# Length still statistically significant, but p is lower
+# Nmorph is not significant at all
+summary(mod.flm) 
+# Barely any contribution to explaining the variance
+r.squaredGLMM(mod.flm) # Fixed effects: 4.7%; Fixed+Random: 42.6%
+vif(mod.flm) # Variance Inflation Factors higher for Length and Nmorph, but still OK
+
+mod.flmo <- lmer(logRT ~ 
+                   zipf_z + 
+                   len_z + 
+                   nmorph_z +
+                   old_z +
+                   (1|participant) + 
+                   (1|item), data = trialdata)
+anova(mod.flm, mod.flmo) # Better
+# OLD20 significant, Length AND Nmorph not significant at all
+summary(mod.flmo) 
+# Small contribution to explaining the variance
+r.squaredGLMM(mod.flmo) # Fixed effects: 4.8%; Fixed+Random: 42.7%
+vif(mod.flmo) # VIFs for Length and OLD20 skyrocketing
+
+mod.flmoc <- lmer(logRT ~ 
+                   zipf_z + 
+                   len_z + 
+                   nmorph_z +
+                   old_z +
+                   conc_z +
+                   (1|participant) + 
+                   (1|item), data = trialdata)
+anova(mod.flmo, mod.flmoc) # Better
+# Concreteness significant, OLD20 too, Length AND Nmorph not
+summary(mod.flmoc) 
+# Small contribution to explaining the variance
+r.squaredGLMM(mod.flmoc) # Fixed effects: 5%; Fixed+Random: 42.7%
+vif(mod.flmoc) # VIFs for Length and OLD20 high, but stable
+
+mod.flmoca <- lmer(logRT ~ 
+                   zipf_z + 
+                   len_z + 
+                   nmorph_z +
+                   old_z +
+                   conc_z +
+                   aoa_z + 
+                   (1|participant) + 
+                   (1|item), data = trialdata)
+anova(mod.flmoc, mod.flmoca) # Better
+# Concreteness not significant anymore, AoA highly significant, others stable
+summary(mod.flmoca) 
+# Small contribution to explaining the variance
+r.squaredGLMM(mod.flmoca) # Fixed effects: 5.6%; Fixed+Random: 42.6%
+vif(mod.flmoca) # VIFs for Length and OLD20 high, but stable
+
+mod.flmocaw <- lmer(logRT ~ 
+                   zipf_z + 
+                   len_z + 
+                   nmorph_z +
+                   old_z +
+                   conc_z +
+                   aoa_z + 
+                   wp_z + 
+                   (1|participant) + 
+                   (1|item), data = trialdata)
+anova(mod.flmoca, mod.flmocaw) # Better
+# WP highly significant, others stable
+summary(mod.flmocaw) 
+# Small contribution to explaining the variance
+r.squaredGLMM(mod.flmocaw) # Fixed effects: 6%; Fixed+Random: 42.6%
+vif(mod.flmocaw) # VIFs for Length and OLD20 high, but stable
+
+# OLD20 significant, but inflates variance together with Length;
+# Length correlated with nmorph; keep one or the other
+
+mod.fmocaw <- lmer(logRT ~ 
+                   zipf_z + 
+                   nmorph_z +
+                   old_z +
+                   conc_z +
+                   aoa_z + 
+                   wp_z + 
+                   (1|participant) + 
+                   (1|item), data = trialdata)
+anova(mod.flmocaw, mod.fmocaw) # Not better than having both
+# No change in most, but OLD20 is now more significant
+summary(mod.fmocaw) 
+# No change in explaining the variance
+r.squaredGLMM(mod.fmocaw) # Fixed effects: 6%; Fixed+Random: 42.6%
+vif(mod.fmocaw) # VIF for OLD20 below threshold now
+
+mod.flocaw <- lmer(logRT ~ 
+                   zipf_z + 
+                   len_z + 
+                   old_z +
+                   conc_z +
+                   aoa_z + 
+                   wp_z + 
+                   (1|participant) + 
+                   (1|item), data = trialdata)
+anova(mod.flmocaw, mod.flocaw) # Not better than having both
+# No change in most, but OLD20 is now more significant
+summary(mod.flocaw) 
+# No change in explaining the variance
+r.squaredGLMM(mod.flocaw) # Fixed effects: 6%; Fixed+Random: 42.6%
+vif(mod.flocaw) # VIFs for Length and OLD20 still very high
+
+# Keep nmorph, proceed to the full model
+mod.full.noslope <- lmer(logRT ~ 
+                   dim_type + 
+                   zipf_z + 
+                   nmorph_z +
+                   old_z +
+                   conc_z +
+                   aoa_z + 
+                   wp_z + 
+                   (1|participant) + 
+                   (1|item), data = trialdata)
+anova(mod.fmocaw, mod.full.noslope) # Not better
+# No change in most, but OLD20 is now more significant
+summary(mod.full.noslope) 
+# Slight change in explaining the variance
+r.squaredGLMM(mod.full.noslope) # Fixed effects: 6.1%; Fixed+Random: 42.6%
+vif(mod.full.noslope) # VIF for OLD20 below threshold now, others fine
+
+mod.full.withslope <- lmer(logRT ~ 
+                   dim_type + 
+                   zipf_z + 
+                   nmorph_z +
+                   old_z +
+                   conc_z +
+                   aoa_z + 
+                   wp_z + 
+                   (dim_type|participant) + 
+                   (1|item), data = trialdata) # Singular fit for slope
+anova(mod.full.noslope, mod.full.withslope) # Not better
+# No change in most, but OLD20 is now more significant
+summary(mod.full.withslope) 
+# Little change in explaining the variance
+r.squaredGLMM(mod.full.withslope) # Fixed effects: 6.1%; Fixed+Random: 42.6%
+vif(mod.full.withslope) # VIF for OLD20 below threshold now, others fine
+
+# Interactions? 
+mod.int.noslope <- lmer(logRT ~ 
+                   dim_type*zipf_z + 
+                   nmorph_z +
+                   old_z +
+                   conc_z +
+                   aoa_z + 
+                   wp_z + 
+                   (1|participant) + 
+                   (1|item), data = trialdata)
+anova(mod.full.noslope, mod.int.noslope) # Slightly better
+# No change in most, but OLD20 is now more significant
+summary(mod.int.noslope) 
+# Little change in explaining the variance
+r.squaredGLMM(mod.int.noslope) # Fixed effects: 6.1%; Fixed+Random: 42.6%
+vif(mod.int.noslope) # VIF for OLD20 below threshold now, others fine
+```
+
+```{r full_model}
+# Run the full model
 mod_full <- lmer(logRT ~ 
-                dim_type +
-                zipf_z*len_z + 
+                dim_type*zipf_z +
                 nmorph_z +
                 old_z +
                 conc_z +
                 aoa_z +
                 wp_z + 
-                (dim_type|participant) +
+                (1|participant) +
                 (1|item), data = trialdata)
 summary(mod_full)
-r.squaredGLMM(mod_full)
+Anova(mod_full)
+r.squaredGLMM(mod_full) # Fixed effects: 6.1%; Fixed+Random: 44%
 vif(mod_full) # Get variance inflation factors to check for collinearity
+hist(residuals(mod_full), col = 'skyblue2') # Plot 1, histogram
+qqPlot(residuals(mod_full)) # Plot 2, Q-Q plot
+plot(fitted(mod_full), residuals(mod_full)) # Plot 3, residual plot
+fixef(mod_full)
+model_table <- as.data.frame(round(summary(mod_full)$coefficients, 4))
+print(model_table)
 ```
