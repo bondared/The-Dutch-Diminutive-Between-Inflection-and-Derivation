@@ -202,7 +202,7 @@ trialdata %>% ggplot(aes(x = dim_type, y = logRT, fill = dim_type)) +
     x = "Diminutive Type",
     y = "Reaction Times",
   ) +
-  scale_x_discrete(labels=c('Derivational', 'Inflectional')) + 
+  scale_x_discrete(labels=c('DERIV', 'INFL')) + 
   stat_summary(fun.data = get_box_stats, geom = "text", hjust = 0.5, vjust = 0.9) +
   scale_fill_brewer(palette = "Paired") +
   stat_compare_means(method="t.test", label.y = 6.0, label.x = 1.35)
@@ -491,6 +491,7 @@ summary(mod_full)
 Anova(mod_full)
 r.squaredGLMM(mod_full) # Fixed effects: 6.1%; Fixed+Random: 44%
 vif(mod_full) # Get variance inflation factors to check for collinearity
+# Plots not ideal, but not as grossly off as before
 hist(residuals(mod_full), col = 'skyblue2') # Plot 1, histogram
 qqPlot(residuals(mod_full)) # Plot 2, Q-Q plot
 plot(fitted(mod_full), residuals(mod_full)) # Plot 3, residual plot

@@ -1,0 +1,32 @@
+\chapter{Study}\label{chp:study}
+
+What happens in this chapter?
+
+\section{Design}
+\begin{itemize}
+\item Briefly talk about the way visual word processing experiments are set up
+\item Introduce lexical decision data corpora and the idea of a simulated experiment (cite \cite{Brysbaert+etal+2016})
+\item Outline the corpus, describe the advantages, mention the limitations
+\end{itemize}
+\section{Implementation}
+\begin{itemize}
+\item Go to town on the data pre-processing and stimulus selection
+\item Describe the process of assigning values to the diminutives in question
+\item Present the summary of the resulting dataset
+\end{itemize}
+Each item was assigned a value for the variable "dim\_type" and a value for "dec\_criterion", alongside a straightforward morpheme count. The guidelines of assignment closely followed the distinguishing features of the two diminutives: an item was assigned "infl" for "Inflectional" if a) its meaning was compositional in nature, usually reflecting the "small X" pattern, or if b) it forced a kind-to-item reading shift; conversely, non-compositional items (either lexicalised diminutives or diminutiva tantum) were assigned "deriv" for "Derivational". An additional test for the derivational nature of the suffixed item was to check for the item exhibiting the predicted suffixal allomorph (see Phonological Allomorphy Generalisations below): thus, bloem-pje "small flower" features the predicted allomorph -pje and is treated as inflected, bloem-etje has a different allomorph from the expected -pje and means "bouquet" instead, hence it being treated as derived.  
+
+The value "dec\_criterion" stands for "Decisive Criterion", but can as well be read as defining the subtype of diminutive, with values "small\_X", "kind\_to\_item", "lex\_dim" and "dim\_tant" reflecting the assignment criteria above. Items that had at least one of the inflectional and one of the derivational type readings at the same time, as reflected in native speaker intuitions and attested in the item entry on https://nl.wiktionary.org/, were assigned the value "both" for the variable "dim\_type" and a combination of the four subtype values for the variable "dec\_criterion".
+
+\section{Analysis}
+\begin{itemize}
+\item Give descriptive statistics (means and boxplots)
+\item Describe the methods used for inferential analysis (cite \cite{Winter+2019}), mention all the relevant R packages (\texttt{dplyr}, \cite{dplyr+2022}; \texttt{readr}, \cite{readr+2022}; \texttt{lme4}, \cite{lme4+2015}; \texttt{car}, \cite{car+2019}; \texttt{ggplot2}, \cite{ggplot2+2016}; \texttt{effsize}, \cite{effsize+2020}; \texttt{MuMIn}, \cite{MuMIn+2022})
+\item The motivation for sum-coding between "deriv" and "infl" is taken from \cite{Winter+2019}, where it is argued that sum-coding is better suited for mixed-effects models with interactions and random effects; additionally, sum-coding is argued to make the coefficients easier to interpret.
+\item The formula for the experimental model closely follows the formula reported in the DLP2 paper, with the addition of two predictors:
+\begin{enumerate}
+    \item \texttt{dim\_type}, a factor with values "deriv" and "infl" (possibly "both" for the expanded dataset): see above for the discussion of the predictions.
+    \item \texttt{nmorph}, a numeric with values reflecting the (observable and theoretically motivated) morpheme count in the structure of each wordform: assuming full decomposition, every word is broken down to the most primitive units (= morphemes), so it logically follows that the more morphemes a wordform consists of, the more there is to break down and recompose, and the more time it should take to recognize a word.
+\end{enumerate} 
+\item The final formula of the model is therefore this (see \texttt{mod\_full} below):
+\end{itemize}
