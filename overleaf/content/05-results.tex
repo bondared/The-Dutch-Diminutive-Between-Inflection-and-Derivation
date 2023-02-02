@@ -10,7 +10,7 @@ Possibly include a t-tests as a foretaste
 \begin{figure}[h]
     \centering
     \includegraphics[width=\textwidth]{images/dim_box.png}
-    \caption{Boxplot of Diminutive Type}
+    \caption[Boxplot of log-transformed reaction times by diminutive type]{Boxplot of log-transformed reaction times by diminutive type. 50\% of all observations fall within the interquartile range (IQR) represented by each box; the thick lines stand for median values. Values beyond the box represent the top and bottom 25\%. The distance between each whisker and its side of the box equals 1.5*IQR; more extreme values are represented by dots beyond each whisker. Summary information is provided above each condition; difference between means is attested as significant by way of a t-test (\textit{p}<0.05).}
     \label{fig:boxplot}
 \end{figure}
 
@@ -21,24 +21,24 @@ Possibly include a t-tests as a foretaste
 
 \begin{table}[h]
 \centering
-\label{tab:regressionrt}
+\label{tab:reg-fixed}
 \resizebox{0.8\textwidth}{!}{%
 \begin{tabular}{lccc}
 \toprule
-\textbf{Predictor} & \textbf{Estimate} & \textbf{SE} & \textbf{\textit{p}-Value}  \\ \midrule
-(Intercept) & 6.3137 & 0.0161 & \textbf{>0.001}\\
+\textbf{Predictor} & \textbf{Estimate} & \textbf{Standard Error} & \textbf{\textit{p}-Value}  \\ \midrule
+(Intercept) & 6.3137 & 0.0161 & \textbf{<0.001}\\
 Diminutive Type & -0.0032 & 0.0036 & 0.3669 \\
-Frequency  & -0.0245 & 0.0045 & \textbf{>0.001} \\
+Frequency  & -0.0245 & 0.0045 & \textbf{<0.001} \\
 Morpheme Count & 0.0026 & 0.0051 & 0.6089 \\
-Orth. Neighbourhood & 0.0202 & 0.0052 & \textbf{>0.001} \\
+Orth. Neighbourhood & 0.0202 & 0.0052 & \textbf{<0.001} \\
 Concreteness & 0.0020 & 0.0038 & 0.5962 \\
-Age of Acquisition & 0.0168 & 0.0043 & \textbf{>0.001} \\
-Word Prevalence & -0.0471 & 0.0085 & \textbf{>0.001} \\
+Age of Acquisition & 0.0168 & 0.0043 & \textbf{<0.001} \\
+Word Prevalence & -0.0471 & 0.0085 & \textbf{<0.001} \\
 Dim. Type*Frequency & 0.0071 & 0.0032 & \textbf{0.0298} \\
 \bottomrule
 \end{tabular}%
 }
-\caption{Summary of fixed effects.}
+\caption[Summary of fixed effects from the experimental model]{Summary of fixed effects from the experimental model. All continuous predictors centered and standardised, categorical predictor \textit{Diminutive Type} sum-coded, predictors the effects of which have achieved significance (\textit{p}<0.05) have their \textit{p}-values in boldface.}
 \end{table}
 
 \subsection{Diminutive Type} \label{subsec:dimtype}
@@ -56,9 +56,29 @@ Another predictor based on subjective ratings from students is the age of acquis
 \subsection{Word Prevalence} \label{subsec:prevalence}
 A novel explanatory variable proposed by \cite{Keuleers+etal+2015} and introduced in the Dutch Lexicon Project 2 dataset, word prevalence is defined as "word knowledge in the population" \parencite{Brysbaert+etal+2016} and intended as a supplementary predictor to word frequency. Frequency is corpus-dependent and is not always the most reliable measure of how well-known or widely-used a wordform is: for example, words referring to household objects are well-known in the general population, but this fact is not represented in their (typically low) frequency scores. Word prevalence was introduced to account for this as well as other predictive shortcomings of frequency. Its prediction is straightforward: the better-known a word, the less time it takes to recognise. The values for prevalence were collected by \cite{Keuleers+etal+2015} from over 100.000 Dutch-speaking participants from Flanders. Both \cite{Keuleers+etal+2015} and \cite{Brysbaert+etal+2016} report the predictor as one of the most correlated with reaction times, usually second-best after (and in some cases even more explanatory than) frequency. As such, it is no surprise to see this effect replicated in a model based on a subset of the DLP2: word prevalence is a facilitatory explanatory variable with the single largest effect size in the entire model.
 \subsection{Interaction of Diminutive Type and Frequency} \label{subsec:interaction}
-hehe
+herehererasda
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{images/mod_int.png}
+    \caption[Frequency interactions from the experimental model]{Frequency interactions from the experimental model. Both measurements on the X and Y axis are reported post-transformation: logarithmic for reaction times and Zipf-transformation for frequency. Zipf-values subsequently centered for easier interpretation of effects in the model.}
+    \label{fig:interaction}
+\end{figure}
 \subsection{Random Effects}
-hehe
+\begin{table}[h]
+\centering
+\label{tab:reg-random}
+\resizebox{0.8\textwidth}{!}{%
+\begin{tabular}{lccc}
+\toprule
+\textbf{Groups} & \textbf{Group Size} & \textbf{Variance} & \textbf{Standard Deviation}  \\ \midrule
+item & 270 & 0.0018 & 0.0426\\
+participant & 81 & 0.0202 & 0.1422 \\
+residual & \textemdash & 0.0347 & 0.1863 \\
+\bottomrule
+\end{tabular}%
+}
+\caption[Summary of random effects from the experimental model]{Summary of random effects from the experimental model.}
+\end{table}
 
 \section{Summary} \label{sec:stats_summary}
 \begin{itemize}

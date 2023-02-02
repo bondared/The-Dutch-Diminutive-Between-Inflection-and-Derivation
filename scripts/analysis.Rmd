@@ -22,6 +22,8 @@ library(lme4) # For mixed-effects linear regression modelling
 library(car) # For alternative options when it comes to plots and regressions
 library(ggplot2) # For a more comprehensive way of plotting data
 library(ggpubr) # For including statistical values in plots
+library(sjPlot) # For plotting interaction effects
+library(sjmisc) # Auxiliary library for sjPlot
 library(effsize) # For Cohen's d, etc.
 library(afex) # For p-values in lmer summaries
 library(MuMIn) # For extracting R-squared values from lmers
@@ -178,7 +180,7 @@ trialdata <- mutate(trialdata,
 ```{r boxplot_stats_setup, include=FALSE}
 get_box_stats <- function(y, upper_limit = max(trialdata$logRT) * 1.1) {
   return(data.frame(
-    y = 0.95 * upper_limit,
+    y = 0.975 * upper_limit,
     label = paste(
       "Count =", length(y), "\n",
       "Mean =", round(mean(y), 2), "\n",
@@ -207,7 +209,7 @@ trialdata %>% ggplot(aes(x = dim_type, y = logRT, fill = dim_type)) +
   scale_fill_brewer(palette = "Paired") +
   stat_compare_means(method="t.test", label.y = 6.0, label.x = 1.35)
 # Save the plot for later
-ggsave("../figures/dim_box.png", width = 8, height = 6)
+ggsave("../figures/dim_box.png", width = 6, height = 4)
 ```
 
 ## 6. Inferential Statistics
@@ -275,7 +277,7 @@ The final formula of the model is therefore this (see "mod_full" below):
 
 ```{r base_model}
 # Run the base model with only frequency and random intercepts
-# Mention including the participant slopes and item intercepts as the 
+# Mention including the participant and item intercepts as the 
 # motivation to satisfy the independence assumption (Winter 2020, Ch.14)
 mod_base <- lmer(logRT ~ zipf_z + 
                    (1|participant) + 
@@ -495,7 +497,19 @@ vif(mod_full) # Get variance inflation factors to check for collinearity
 hist(residuals(mod_full), col = 'skyblue2') # Plot 1, histogram
 qqPlot(residuals(mod_full)) # Plot 2, Q-Q plot
 plot(fitted(mod_full), residuals(mod_full)) # Plot 3, residual plot
+
 fixef(mod_full)
-model_table <- as.data.frame(round(summary(mod_full)$coefficients, 4))
-print(model_table)
+table_fixed <- as.data.frame(round(summary(mod_full)$coefficients, 4))
+print(table_fixed)
+
+# Include an interaction plot for easier interpretability
+plot_model(mod_full, type = "pred", 
+           terms = c("zipf_z", "dim_type"), 
+           title = "",
+           legend.title = "Diminutive Type") +
+  theme_minimal() +
+  legend_style(inside=TRUE, pos="top right") +
+  labs(x = "Frequency", y = "Reaction times")
+# And save it
+ggsave("../figures/mod_int.png", width = 6, height = 4)
 ```

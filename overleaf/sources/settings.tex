@@ -72,6 +72,10 @@
 %\setcounter{lofdepth}{1}
 %\setcounter{lotdepth}{2}
 
+% Merge list of tables and figures together
+\def\table{\def\figurename{Table}\figure} 
+\let\endtable\endfigure 
+
 %%%%%%%%%%%%%% Layout %%%%%%%%%%%%%%
 \setlength{\unitlength}{1cm}
 \newcommand{\abstand}{\dimexpr\paperwidth/18\relax}
