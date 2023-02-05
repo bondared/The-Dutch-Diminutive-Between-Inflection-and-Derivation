@@ -122,8 +122,24 @@ cat(
   "Length~nmorph =", cor(trialdata$Length, trialdata$nmorph), "\n",
   "Nsyl~nmorph =", cor(trialdata$Nsyl, trialdata$nmorph), "\n",
   "Length~OLD20 =", cor(trialdata$Length, trialdata$OLD20), "\n",
-  "nmorph~OLD20 =", cor(trialdata$nmorph, trialdata$OLD20)
+  "nmorph~OLD20 =", cor(trialdata$nmorph, trialdata$OLD20), "\n",
+  "Nsyl~OLD20 =", cor(trialdata$Nsyl, trialdata$OLD20)
 )
+
+# Get mean r-value for all intercorrelations
+meanrcorr <- c(cor(trialdata$Nsyl, trialdata$Length),
+               cor(trialdata$Nsyl, trialdata$nmorph),
+               cor(trialdata$Nsyl, trialdata$OLD20),
+               cor(trialdata$Length, trialdata$nmorph),
+               cor(trialdata$Length, trialdata$OLD20),
+               cor(trialdata$Length, trialdata$Nsyl),
+               cor(trialdata$OLD20, trialdata$Length),
+               cor(trialdata$OLD20, trialdata$nmorph),
+               cor(trialdata$OLD20, trialdata$Nsyl),
+               cor(trialdata$nmorph, trialdata$Length),
+               cor(trialdata$nmorph, trialdata$OLD20),
+               cor(trialdata$nmorph, trialdata$Nsyl))
+mean(meanrcorr)
 
 # Both length and morpheme count pretty highly correlated with syllable count;
 # Keeping Nsyl has much less of a theoretical reason and might impact the
@@ -195,6 +211,8 @@ get_box_stats <- function(y, upper_limit = max(trialdata$logRT) * 1.1) {
 # Get means for the diminutives
 trialdata %>% group_by(dim_type) %>% 
   summarize(M = mean(rtC), SD = sd(rtC))
+trialdata %>% group_by(dim_type) %>% 
+  summarize(M = mean(logRT), SD = sd(logRT))
 
 # Make a plot with all the relevant statistics, throw in a t-test as well
 trialdata %>% ggplot(aes(x = dim_type, y = logRT, fill = dim_type)) +
@@ -224,7 +242,7 @@ trialdata <- mutate(trialdata, dim_type=factor(dim_type))
 ### 6.1. Contrasts and t-tests
 The next two code chunks handle the contrast coding; they are mutually exclusive depending on the decision to include observations with "both" as a value for dim_type. In order to switch between them, go to the chunk options and specify *eval=FALSE* to stop the script from running the code and *include=FALSE* to prevent the code from being included in the final knitted document.
 
-The motivation for sum-coding between "deriv" and "infl" is taken from Winter 2020, where it is argued that sum-coding is better suited for mixed-effects models with interactions and random effects; additionally, sum-coding is argued to make the coefficients easier to interpret.
+The motivation for sum-coding between "deriv" and "infl" is taken from Winter 2019, where it is argued that sum-coding is better suited for mixed-effects models with interactions and random effects; additionally, sum-coding is argued to make the coefficients easier to interpret.
 
 ```{r contrasts_sum}
 # Sum-coding for a purely deriv/infl dataset (see above)
@@ -278,7 +296,7 @@ The final formula of the model is therefore this (see "mod_full" below):
 ```{r base_model}
 # Run the base model with only frequency and random intercepts
 # Mention including the participant and item intercepts as the 
-# motivation to satisfy the independence assumption (Winter 2020, Ch.14)
+# motivation to satisfy the independence assumption (Winter 2019, Ch.14)
 mod_base <- lmer(logRT ~ zipf_z + 
                    (1|participant) + 
                    (1|item), data = trialdata, REML = TRUE)
