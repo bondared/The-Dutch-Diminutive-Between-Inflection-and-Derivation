@@ -217,101 +217,101 @@
 \let\paragraphOld\paragraph
 \renewcommand{\paragraph}[1]{\paragraphOld{#1}\hspace{1ex}}
 
-%%%%%%%%%%%%%% Syntaxhighlighting %%%%%%%%%%%%%%
-\renewcommand{\lstlistingname}{Source Code}% Listing -> Source Code
-\lstloadlanguages{Python, C, C++, R, HTML, Haskell, Java, SQL, PHP, SPARQL, Octave, Matlab, OCL, XML, bash, Ruby}
-\lstset{
-   basicstyle=\color{HUpantone}\small\ttfamily\selectfont,	% \scriptsize the size of the fonts that are used for the code
-   backgroundcolor = \color{gray!20},	% legt Farbe der Box fest
-   breakatwhitespace=false,	% sets if automatic breaks should only happen at whitespace
-   breaklines=true,			% sets automatic line breaking
-   captionpos=b,				% sets the caption-position to bottom, t for top
-   commentstyle=\color{gray}\selectfont,% comment style
-   frame=single,				% adds a frame around the code
-   keepspaces=true,			% keeps spaces in text, useful for keeping indentation
-							% of code (possibly needs columns=flexible)
-   keywordstyle=\bfseries\color{FUblue}\selectfont,% keyword style
-   ndkeywordstyle=\color{HUpantone}\bfseries\selectfont,
-   numbers=left,				% where to put the line-numbers;
-   							% possible values are (none, left, right)
-   numberstyle=\scriptsize\color{FUblue}\selectfont,	% the style that is used for the line-numbers
-   numbersep=9pt,			% how far the line-numbers are from the code
-   stepnumber=1,				% nummeriert nur jede i-te Zeile
-   showspaces=false,			% show spaces everywhere adding particular underscores;
-							% it overrides 'showstringspaces'
-   %showstringspaces=false,	% underline spaces within strings only
-   showtabs=false,			% show tabs within strings adding particular underscores
-   flexiblecolumns=false,
-   %tabsize=1,				% the step between two line-numbers. If 1: each line will be numbered
-   stringstyle=\color{red}\ttfamily\selectfont,	% string literal style
-   numberblanklines=false,				% leere Zeilen werden nicht mitnummeriert
-   xleftmargin=\dimexpr2em\relax,	% Abstand zum linken Layoutrand
-   framexleftmargin=\dimexpr2em-3pt\relax,
-   xrightmargin=\dimexpr2pt\relax,					% Abstand zum rechten Layoutrand
-   framexrightmargin=\dimexpr-2pt\relax,
-   aboveskip=2ex, 
-}
+% %%%%%%%%%%%%%% Syntaxhighlighting %%%%%%%%%%%%%%
+% \renewcommand{\lstlistingname}{Source Code}% Listing -> Source Code
+% \lstloadlanguages{Python, C, C++, R, HTML, Haskell, Java, SQL, PHP, SPARQL, Octave, Matlab, OCL, XML, bash, Ruby}
+% \lstset{
+%    basicstyle=\color{HUpantone}\small\ttfamily\selectfont,	% \scriptsize the size of the fonts that are used for the code
+%    backgroundcolor = \color{gray!20},	% legt Farbe der Box fest
+%    breakatwhitespace=false,	% sets if automatic breaks should only happen at whitespace
+%    breaklines=true,			% sets automatic line breaking
+%    captionpos=b,				% sets the caption-position to bottom, t for top
+%    commentstyle=\color{gray}\selectfont,% comment style
+%    frame=single,				% adds a frame around the code
+%    keepspaces=true,			% keeps spaces in text, useful for keeping indentation
+% 							% of code (possibly needs columns=flexible)
+%    keywordstyle=\bfseries\color{FUblue}\selectfont,% keyword style
+%    ndkeywordstyle=\color{HUpantone}\bfseries\selectfont,
+%    numbers=left,				% where to put the line-numbers;
+%    							% possible values are (none, left, right)
+%    numberstyle=\scriptsize\color{FUblue}\selectfont,	% the style that is used for the line-numbers
+%    numbersep=9pt,			% how far the line-numbers are from the code
+%    stepnumber=1,				% nummeriert nur jede i-te Zeile
+%    showspaces=false,			% show spaces everywhere adding particular underscores;
+% 							% it overrides 'showstringspaces'
+%    %showstringspaces=false,	% underline spaces within strings only
+%    showtabs=false,			% show tabs within strings adding particular underscores
+%    flexiblecolumns=false,
+%    %tabsize=1,				% the step between two line-numbers. If 1: each line will be numbered
+%    stringstyle=\color{red}\ttfamily\selectfont,	% string literal style
+%    numberblanklines=false,				% leere Zeilen werden nicht mitnummeriert
+%    xleftmargin=\dimexpr2em\relax,	% Abstand zum linken Layoutrand
+%    framexleftmargin=\dimexpr2em-3pt\relax,
+%    xrightmargin=\dimexpr2pt\relax,					% Abstand zum rechten Layoutrand
+%    framexrightmargin=\dimexpr-2pt\relax,
+%    aboveskip=2ex, 
+% }
 
-%%%%%%%%%%%%%%%% definition of language %%%%%%%%%%%%%%%%
-\lstdefinestyle{html}{
-   language=HTML,
-}
-\lstdefinestyle{c}{
-  language=C,
-}
-\lstdefinestyle{cpp}{
-  language=C++,
-}
-\lstdefinestyle{py}{
-   language=Python,
-}
-\lstdefinestyle{php}{
-  language=PHP,
-}
-\lstdefinestyle{rdf}{%oder xml
-  language=SPARQL,
-}
-\lstdefinestyle{o}{
-  language=Octave,
-}
-\lstdefinestyle{m}{
-  language=Matlab,
-}
-\lstdefinestyle{ocl}{%omg
-  language=OCL,
-}
-\lstdefinestyle{xml}{
-  language=XML,
-}
-\lstdefinestyle{hs}{
-  language=Haskell,
-}
-\lstdefinestyle{sql}{
-  language=SQL,
-}
-\lstdefinestyle{bash}{
-  language=bash,
-}
-\lstdefinestyle{pseudo}{
-  language = Python,
-  mathescape = true,
-  morekeywords = {do, procedure, end, while, if, else},
-}
-\lstdefinestyle{ruby}{
-  language=Ruby,
-}
-\lstdefinestyle{java}{
-	language=Java,
-    morekeywords={typeof, new, true, false, function, return, null, catch, switch, var, if, in, while, do, else, case, break, class, export, boolean, throw, implements, extends, import, this, int, Integer, Boolean, String, Object, Float, Double, double, float, long, void},
-    ndkeywords={List, E},
-	extendedchars=true,% lets you use non-ASCII characters;
-    % for 8-bits encodings only, does not work with UTF-8
-}
-\lstdefinestyle{R}{
-	language=R,
-	extendedchars=true,% for 8-bits encodings only,
-    % does not work with UTF-8
-}
+% %%%%%%%%%%%%%%%% definition of language %%%%%%%%%%%%%%%%
+% \lstdefinestyle{html}{
+%    language=HTML,
+% }
+% \lstdefinestyle{c}{
+%   language=C,
+% }
+% \lstdefinestyle{cpp}{
+%   language=C++,
+% }
+% \lstdefinestyle{py}{
+%    language=Python,
+% }
+% \lstdefinestyle{php}{
+%   language=PHP,
+% }
+% \lstdefinestyle{rdf}{%oder xml
+%   language=SPARQL,
+% }
+% \lstdefinestyle{o}{
+%   language=Octave,
+% }
+% \lstdefinestyle{m}{
+%   language=Matlab,
+% }
+% \lstdefinestyle{ocl}{%omg
+%   language=OCL,
+% }
+% \lstdefinestyle{xml}{
+%   language=XML,
+% }
+% \lstdefinestyle{hs}{
+%   language=Haskell,
+% }
+% \lstdefinestyle{sql}{
+%   language=SQL,
+% }
+% \lstdefinestyle{bash}{
+%   language=bash,
+% }
+% \lstdefinestyle{pseudo}{
+%   language = Python,
+%   mathescape = true,
+%   morekeywords = {do, procedure, end, while, if, else},
+% }
+% \lstdefinestyle{ruby}{
+%   language=Ruby,
+% }
+% \lstdefinestyle{java}{
+% 	language=Java,
+%     morekeywords={typeof, new, true, false, function, return, null, catch, switch, var, if, in, while, do, else, case, break, class, export, boolean, throw, implements, extends, import, this, int, Integer, Boolean, String, Object, Float, Double, double, float, long, void},
+%     ndkeywords={List, E},
+% 	extendedchars=true,% lets you use non-ASCII characters;
+%     % for 8-bits encodings only, does not work with UTF-8
+% }
+% \lstdefinestyle{R}{
+% 	language=R,
+% 	extendedchars=true,% for 8-bits encodings only,
+%     % does not work with UTF-8
+% }
 
 %%%%%%%%%%%%%% Environments %%%%%%%%%%%%%%
 \newenvironment{abstractDE}{%
@@ -326,4 +326,11 @@
 \selectlanguage{english}%
 \begin{center}%
 \textbf{\abstractname}
+\end{center}}{}
+
+\newenvironment{acknowledgements}{%
+\thispagestyle{empty}%
+\selectlanguage{english}%
+\begin{center}%
+\textbf{Acknowledgements}
 \end{center}}{}

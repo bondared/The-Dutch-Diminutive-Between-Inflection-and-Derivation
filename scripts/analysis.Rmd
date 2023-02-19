@@ -162,11 +162,6 @@ trialdata %>%
 
 ## 4. Finalise fine preprocessing
 ```{r final_preprocessing}
-# Optional step: exclude the non-core diminutive items first, 
-# i.e. the ones with multiple ways to parse.
-# NOTE: make sure to change contrasts below!
-trialdata <- filter(trialdata, dim_type !="both")
-
 # Log-transform reaction times using the base logarithm (see Winter 2019)
 trialdata$logRT <- log(trialdata$rtC)
 par(mfrow = c(1, 2))
@@ -190,6 +185,11 @@ trialdata <- mutate(trialdata,
                     # Word prevalence already standardised, just center
                     wp_z = scale(Word_prevalence1, scale = FALSE))
 
+# Optional step: exclude the non-core diminutive items first, 
+# i.e. the ones with multiple ways to parse.
+# NOTE: make sure to change contrasts below!
+trialboth <- trialdata # for exploring later
+trialdata <- filter(trialdata, dim_type !="both")
 ```
 
 ## 5. Descriptive Statistics
@@ -254,31 +254,6 @@ cohen.d(rtC ~ dim_type, data = trialdata)
 cohen.d(logRT ~ dim_type, data = trialdata)
 ```
 
-The motivation for Helmert-coding between "deriv", "infl", and "both" is simple: for wordforms with either "deriv" or "infl", a single decomposition pipeline is proposed. Assuming structural differences, recognizing either is the same type of operation being performed in a different location in the structure. Compare with "both", where the decomposition apparatus presumably pursues both leads at once; therefore, this should be reflected in the coding as such:
-
-  - First, compare the differences between deriv and infl (either x or y)
-  - Then, compare their average RTs to both (x and y at the same time)
-  
-```{r contrasts_helmert, eval=FALSE, include=FALSE}
-# Helmert coding for deriv/infl/both dataset:
-# Compare the means of deriv and infl, then compare their average to both
-ctrMatrix <- cbind(c(0, -1, 1), c(-2, 1, 1))
-contrasts(trialdata$dim_type) <- ctrMatrix
-contrasts(trialdata$dim_type)
-# Run paired t-tests, see if the differences between those means are significant
-df1 <- trialdata %>%
-    filter(dim_type == "deriv" | dim_type == "infl") %>%
-    select(dim_type, rtC)
-df2 <- trialdata %>%
-    filter(dim_type == "infl" | dim_type == "both") %>%
-    select(dim_type, rtC)
-df3 <- trialdata %>%
-    filter(dim_type == "both" | dim_type == "deriv") %>%
-    select(dim_type, rtC)
-t.test(rtC ~ dim_type, data = df1)
-t.test(rtC ~ dim_type, data = df2)
-t.test(rtC ~ dim_type, data = df3)
-```
 
 ### 6.2. Modelling
 
@@ -531,3 +506,68 @@ plot_model(mod_full, type = "pred",
 # And save it
 ggsave("../figures/mod_int.png", width = 6, height = 4)
 ```
+### 6.3. An exploratory look into the "both" group
+
+The motivation for Helmert-coding between "deriv", "infl", and "both" is simple: for wordforms with either "deriv" or "infl", a single decomposition pipeline is proposed. Assuming structural differences, recognizing either is the same type of operation being performed in a different location in the structure. Compare with "both", where the decomposition apparatus presumably pursues both leads at once; therefore, this should be reflected in the coding as such:
+
+  - First, compare the differences between deriv and infl (either x or y)
+  - Then, compare their average RTs to both (x and y at the same time)
+
+```{r contrasts_helmert}
+# Helmert coding for deriv/infl/both dataset:
+# Compare the means of deriv and infl, then compare their average to both
+ctrMatrix <- cbind(c(0, -1, 1), c(-2, 1, 1))
+contrasts(trialboth$dim_type) <- ctrMatrix
+contrasts(trialboth$dim_type)
+# Run paired t-tests, see if the differences between those means are significant
+df1 <- trialboth %>%
+    filter(dim_type == "deriv" | dim_type == "infl") %>%
+    select(dim_type, rtC)
+df2 <- trialboth %>%
+    filter(dim_type == "infl" | dim_type == "both") %>%
+    select(dim_type, rtC)
+df3 <- trialboth %>%
+    filter(dim_type == "both" | dim_type == "deriv") %>%
+    select(dim_type, rtC)
+t.test(rtC ~ dim_type, data = df1)
+t.test(rtC ~ dim_type, data = df2)
+t.test(rtC ~ dim_type, data = df3)
+```
+
+```{r plot_both}
+get_box_stats <- function(y, upper_limit = max(trialboth$logRT) * 1.1) {
+  return(data.frame(
+    y = 0.975 * upper_limit,
+    label = paste(
+      "Count =", length(y), "\n",
+      "Mean =", round(mean(y), 2), "\n",
+      "Median =", round(median(y), 2), "\n"
+    )
+  ))
+}
+
+trialboth %>% ggplot(aes(x = dim_type, y = logRT, fill = dim_type)) +
+  stat_boxplot(geom ='errorbar', linewidth=1, width=.5) + 
+  geom_boxplot(lwd=1, width=.7, show.legend = FALSE) + theme_minimal() +
+  labs(
+    x = "Diminutive Type",
+    y = "Reaction Times",
+  ) +
+  scale_x_discrete(labels=c("BOTH", "DERIV", "INFL")) + 
+  stat_summary(fun.data = get_box_stats, geom = "text", hjust = 0.5, vjust = 0.9) +
+  scale_fill_brewer(palette = "Paired")
+# Save the plot for later
+ggsave("../figures/both_box.png", width = 6, height = 4)
+
+mod_full_both <- lmer(logRT ~ 
+                dim_type*zipf_z +
+                nmorph_z +
+                old_z +
+                conc_z +
+                aoa_z +
+                wp_z + 
+                (1|participant) +
+                (1|item), data = trialboth)
+summary(mod_full_both)
+```
+
